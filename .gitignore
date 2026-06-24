@@ -1,12 +1,36 @@
+*.log
+# Environment / secrets
+.env
+*.env
 
+# Build output
+bin/
+obj/
+
+# Visual Studio
+.vs/
 *.user
 *.suo
 *.userosscache
 *.sln.docstates
-*.env
 
+# FFmpeg binaries (large, not source code)
+ffmpeg/
 
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
 
+# Runtime generated files
+moondream_infer.py
+settings.json
 
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
 
+# Logs
 *.log
+DigitAnalyzerSTR_pip_error.txt
