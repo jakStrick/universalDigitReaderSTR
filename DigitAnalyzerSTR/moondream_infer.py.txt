@@ -1,0 +1,81 @@
+#!/usr/bin/env python3
+"""
+moondream_infer.py — called by DigitAnalyzerSTR to analyze a single frame.
+
+Usage:
+    python moondream_infer.py <image_path> <mode> [columns_json]
+
+    mode = "discover"  — find all labeled fields, return {label: value} JSON
+    mode = "read"      — read values for known columns (pass columns as JSON array)
+
+Outputs a single line of JSON to stdout.
+Errors go to stderr only — stdout is always valid JSON.
+"""
+
+import sys
+import json
+import os
+
+def main():
+    if len(sys.argv) < 3:
+        print("{}", flush=True)
+        return
+
+    image_path = sys.argv[1]
+    mode       = sys.argv[2]
+    columns    = json.loads(sys.argv[3]) if len(sys.argv) > 3 else []
+
+    if not os.path.exists(image_path):
+        print(json.dumps({"error": "Image not found"}), flush=True)
+        return
+
+    try:
+        import moondream as md
+        from PIL import Image
+
+        model = md.vl(api_key="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXlfaWQiOiIzZjlhNWE1NS00OGViLTRjNjUtYjEyYy0xMWFhYzQ3MDNkOGQiLCJvcmdfaWQiOiJGaUY2dWJxcWJXTURXb3dVYTFZdWs4NndySWwzQnQ3dCIsImlhdCI6MTc4MjMzMjI5MywidmVyIjoxfQ.AzjAXigJAs7NrihPGoZqHGEtU_UuhTMho2B0PanMEVI")
+        image = Image.open(image_path)
+
+        if mode == "discover":
+            prompt = (
+                "This is a screenshot of an industrial process control display showing numeric measurements. "
+                "Find every labeled numeric field visible on screen. "
+                "Return ONLY a JSON object where each key is the field label exactly as printed on screen "
+                "and each value is the numeric reading shown next to it as a string. "
+                "If a value is unreadable use \"?\". "
+                "Example: {\"SiH4 flow\": \"125.3\", \"temperature\": \"350\"}. "
+                "No explanation, no markdown, only the raw JSON object."
+            )
+        else:
+            col_list = ", ".join(f'"{c}"' for c in columns)
+            prompt = (
+                f"This is a screenshot of an industrial process control display. "
+                f"Read the current value for each of these fields: {col_list}. "
+                f"Return ONLY a JSON object with those exact keys and their current values as strings. "
+                f"If a value is unreadable use \"?\". "
+                f"No explanation, no markdown, only the raw JSON object."
+            )
+
+        result = model.query(image, prompt)
+        answer = result.get("answer", "") if isinstance(result, dict) else str(result)
+
+        start = answer.find("{")
+        end   = answer.rfind("}") + 1
+
+        if start >= 0 and end > start:
+            try:
+                parsed = json.loads(answer[start:end])
+                print(json.dumps(parsed), flush=True)
+                return
+            except json.JSONDecodeError:
+                pass
+
+        print("{}", flush=True)
+
+    except ImportError as e:
+        print(json.dumps({"error": f"Import failed: {str(e)}"}), flush=True)
+    except Exception as e:
+        print(json.dumps({"error": str(e)}), flush=True)
+
+if __name__ == "__main__":
+    main()
