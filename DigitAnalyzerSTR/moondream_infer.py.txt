@@ -16,6 +16,39 @@ import sys
 import json
 import os
 
+def preprocess_image(image):
+    """Sharpen and boost contrast to improve digit recognition accuracy."""
+    from PIL import ImageEnhance, ImageFilter
+    image = image.convert("RGB")
+    image = ImageEnhance.Contrast(image).enhance(2.0)
+    image = ImageEnhance.Sharpness(image).enhance(3.0)
+    image = image.filter(ImageFilter.SHARPEN)
+    return image
+
+def query_with_retry(model, image, prompt):
+    """Run inference twice on uncertain results and return the better answer."""
+    result1 = model.query(image, prompt)
+    answer1 = result1.get("answer", "") if isinstance(result1, dict) else str(result1)
+
+    # If result has question marks, try again and pick the better one
+    if "?" in answer1:
+        result2 = model.query(image, prompt)
+        answer2 = result2.get("answer", "") if isinstance(result2, dict) else str(result2)
+        return answer1 if answer1.count("?") <= answer2.count("?") else answer2
+
+    return answer1
+
+def extract_json(answer):
+    """Extract and parse JSON object from model response."""
+    start = answer.find("{")
+    end   = answer.rfind("}") + 1
+    if start >= 0 and end > start:
+        try:
+            return json.loads(answer[start:end])
+        except json.JSONDecodeError:
+            pass
+    return None
+
 def main():
     if len(sys.argv) < 3:
         print("{}", flush=True)
@@ -34,7 +67,10 @@ def main():
         from PIL import Image
 
         model = md.vl(api_key="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXlfaWQiOiIzZjlhNWE1NS00OGViLTRjNjUtYjEyYy0xMWFhYzQ3MDNkOGQiLCJvcmdfaWQiOiJGaUY2dWJxcWJXTURXb3dVYTFZdWs4NndySWwzQnQ3dCIsImlhdCI6MTc4MjMzMjI5MywidmVyIjoxfQ.AzjAXigJAs7NrihPGoZqHGEtU_UuhTMho2B0PanMEVI")
-        image = Image.open(image_path)
+
+        # Improvement #3 — preprocess image before inference
+        raw_image = Image.open(image_path)
+        image = preprocess_image(raw_image)
 
         if mode == "discover":
             prompt = (
@@ -48,29 +84,25 @@ def main():
             )
         else:
             col_list = ", ".join(f'"{c}"' for c in columns)
+            # Improvement #1 — more precise read prompt
             prompt = (
                 f"This is a screenshot of an industrial process control display. "
-                f"Read the current value for each of these fields: {col_list}. "
+                f"Read the EXACT current numeric value for each of these fields: {col_list}. "
+                f"Be precise — read every digit carefully including decimal points. "
+                f"Do not estimate or round. If a display shows 125.3 return '125.3' not '125'. "
                 f"Return ONLY a JSON object with those exact keys and their current values as strings. "
-                f"If a value is unreadable use \"?\". "
+                f"If a value is genuinely unreadable use '?'. "
                 f"No explanation, no markdown, only the raw JSON object."
             )
 
-        result = model.query(image, prompt)
-        answer = result.get("answer", "") if isinstance(result, dict) else str(result)
+        # Improvement #2 — retry on uncertain results
+        answer = query_with_retry(model, image, prompt)
 
-        start = answer.find("{")
-        end   = answer.rfind("}") + 1
-
-        if start >= 0 and end > start:
-            try:
-                parsed = json.loads(answer[start:end])
-                print(json.dumps(parsed), flush=True)
-                return
-            except json.JSONDecodeError:
-                pass
-
-        print("{}", flush=True)
+        parsed = extract_json(answer)
+        if parsed is not None:
+            print(json.dumps(parsed), flush=True)
+        else:
+            print("{}", flush=True)
 
     except ImportError as e:
         print(json.dumps({"error": f"Import failed: {str(e)}"}), flush=True)

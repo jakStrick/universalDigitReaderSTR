@@ -187,7 +187,7 @@ namespace DigitAnalyzerSTR
                 FlatStyle = FlatStyle.Flat,
                 Font = new Font("Segoe UI", 10f)
             };
-            foreach (int sec in new[] { 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60 })
+            foreach (int sec in new[] { 1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60 })
                 _intervalCombo.Items.Add($"Every {sec} seconds");
             _intervalCombo.SelectedIndex = 1;
             layout.Controls.Add(_intervalCombo, 0, 5);

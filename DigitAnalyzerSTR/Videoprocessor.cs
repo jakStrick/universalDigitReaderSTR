@@ -129,19 +129,20 @@ namespace DigitAnalyzerSTR
         }
 
         // ---------------------------------------------------------------
-        // Frame extraction — PNG temp file, caller deletes after use
+        // Frame extraction — Improvement #4: 2x upscale for better digit
+        // recognition on small LCD displays. PNG temp file, caller deletes.
         // ---------------------------------------------------------------
         private async Task<string?> ExtractFrameAsync(double seekSeconds)
         {
-            string tmp = Path.Combine(Path.GetTempPath(),
-                $"dar_{Guid.NewGuid():N}.png");
+            string tmp = Path.Combine(Path.GetTempPath(), $"dar_{Guid.NewGuid():N}.png");
             try
             {
                 await FFMpegArguments
                     .FromFileInput(_videoPath)
                     .OutputToFile(tmp, true, opts => opts
                         .Seek(TimeSpan.FromSeconds(seekSeconds))
-                        .WithFrameOutputCount(1))
+                        .WithFrameOutputCount(1)
+                        .WithCustomArgument("-vf scale=iw*2:ih*2"))
                     .CancellableThrough(_ct)
                     .ProcessAsynchronously();
 
