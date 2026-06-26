@@ -11,6 +11,7 @@ namespace DigitAnalyzerSTR
         public string VideoFolder { get; set; } = "";
         public string OutputFolder { get; set; } = "";
         public int IntervalSeconds { get; set; } = 10;
+        public int ErrorThresholdPercent { get; set; } = 10;
 
         public static AppSettings Load()
         {

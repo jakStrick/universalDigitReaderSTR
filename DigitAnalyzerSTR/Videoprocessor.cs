@@ -107,6 +107,8 @@ namespace DigitAnalyzerSTR
                         TryDelete(framePath);
                     }
 
+                    Report($"Frame {i + 1} of {seekTimes.Count}  ({FormatTime(t)})", i + 1, seekTimes.Count, values);
+
                     var row = new List<string>
                     {
                         Path.GetFileName(_videoPath),
@@ -158,13 +160,14 @@ namespace DigitAnalyzerSTR
         // ---------------------------------------------------------------
         // Helpers
         // ---------------------------------------------------------------
-        private void Report(string message, int current, int total) =>
+        private void Report(string message, int current, int total, Dictionary<string, string>? values = null) =>
             _progress?.Report(new VideoProcessorProgress
             {
                 Message = message,
                 Current = current,
                 Total = total,
-                VideoName = Path.GetFileName(_videoPath)
+                VideoName = Path.GetFileName(_videoPath),
+                Values = values
             });
 
         private static string CsvRow(IEnumerable<string> fields) =>
@@ -195,6 +198,7 @@ namespace DigitAnalyzerSTR
         public int Current { get; init; }
         public int Total { get; init; }
         public int Percent => Total > 0 ? Current * 100 / Total : 0;
+        public Dictionary<string, string>? Values { get; init; }
     }
 
     public class ProcessResult

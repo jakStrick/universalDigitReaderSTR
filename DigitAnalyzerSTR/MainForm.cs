@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 
 namespace DigitAnalyzerSTR
 {
@@ -21,6 +22,8 @@ namespace DigitAnalyzerSTR
         private Button _startBtn = null!;
         private Button _stopBtn = null!;
         private Panel _modelBanner = null!;
+        private ComboBox _errorThresholdCombo = null!;
+        private DataGridView _liveValuesGrid = null!;
 
         private static readonly Color BgDark = Color.FromArgb(22, 26, 32);
         private static readonly Color BgMid = Color.FromArgb(32, 38, 46);
@@ -35,7 +38,7 @@ namespace DigitAnalyzerSTR
         {
             SuspendLayout();
             Text = "DigitAnalyzerSTR";
-            Size = new Size(1340, 860);
+            Size = new Size(1340, 960);
             MinimumSize = new Size(1100, 720);
             StartPosition = FormStartPosition.CenterScreen;
             BackColor = BgDark;
@@ -154,7 +157,7 @@ namespace DigitAnalyzerSTR
             {
                 Dock = DockStyle.Fill,
                 ColumnCount = 1,
-                RowCount = 10,
+                RowCount = 12,
                 BackColor = BgDark
             };
 
@@ -164,10 +167,12 @@ namespace DigitAnalyzerSTR
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 70F));   // 3  output folder input
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 70F));   // 4  label (16px gap baked in)
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 70F));   // 5  interval combo
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 70F));   // 6  label (16px gap baked in)
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 130F));   // 7  queue list
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 70F));   // 8  refresh btn
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 116F));   // 9  start/stop
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 50F));   // 6  error threshold label
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 50F));   // 7  error threshold combo
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 70F));   // 8  label (16px gap baked in)
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 130F));   // 9  queue list
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 70F));   // 10 refresh btn
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 116F));  // 11 start/stop
 
             layout.Controls.Add(TinyLabel("VIDEO FOLDER"), 0, 0);
             layout.Controls.Add(FolderRow(out _videoFolderBox, _settings.VideoFolder,
@@ -192,7 +197,22 @@ namespace DigitAnalyzerSTR
             _intervalCombo.SelectedIndex = 1;
             layout.Controls.Add(_intervalCombo, 0, 5);
 
-            layout.Controls.Add(GappedLabel("VIDEO QUEUE"), 0, 6);
+            layout.Controls.Add(GappedLabel("ACCEPTABLE ERROR %"), 0, 6);
+            _errorThresholdCombo = new ComboBox
+            {
+                Dock = DockStyle.Fill,
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                BackColor = BgPanel,
+                ForeColor = TextPrimary,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 10f)
+            };
+            foreach (int pct in new[] { 1, 2, 5, 10, 15, 20, 25 })
+                _errorThresholdCombo.Items.Add($"{pct}%");
+            _errorThresholdCombo.SelectedIndex = 3; // 10% default
+            layout.Controls.Add(_errorThresholdCombo, 0, 7);
+
+            layout.Controls.Add(GappedLabel("VIDEO QUEUE"), 0, 8);
             _queueList = new ListBox
             {
                 Dock = DockStyle.Fill,
@@ -201,13 +221,13 @@ namespace DigitAnalyzerSTR
                 BorderStyle = BorderStyle.None,
                 Font = new Font("Segoe UI", 9f)
             };
-            layout.Controls.Add(_queueList, 0, 7);
+            layout.Controls.Add(_queueList, 0, 9);
 
             var refreshBtn = MakeButton("↻  Refresh Queue", BgPanel);
             refreshBtn.Dock = DockStyle.Fill;
             refreshBtn.Margin = new Padding(0, 8, 0, 8);
             refreshBtn.Click += RefreshQueue_Click;
-            layout.Controls.Add(refreshBtn, 0, 8);
+            layout.Controls.Add(refreshBtn, 0, 10);
 
             // Start / Stop
             var btnStack = new TableLayoutPanel
@@ -235,7 +255,7 @@ namespace DigitAnalyzerSTR
 
             btnStack.Controls.Add(_startBtn, 0, 0);
             btnStack.Controls.Add(_stopBtn, 0, 1);
-            layout.Controls.Add(btnStack, 0, 9);
+            layout.Controls.Add(btnStack, 0, 11);
 
             parent.Controls.Add(layout);
         }
@@ -251,15 +271,17 @@ namespace DigitAnalyzerSTR
             {
                 Dock = DockStyle.Fill,
                 ColumnCount = 1,
-                RowCount = 6,
+                RowCount = 8,
                 BackColor = BgDark
             };
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 54F));   // 0 file label
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 54F));   // 1 file bar
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 66F));   // 2 overall label (16px gap baked in)
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 54F));   // 3 overall bar
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 66F));   // 4 log header (16px gap baked in)
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 110F));   // 5 log + btn
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 66F));   // 4 live values header (16px gap)
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 72F));    // 5 live values box
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 66F));  // 6 log header (16px gap baked in)
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 28F));   // 7 log + btn
 
             _fileLabel = SmallLabel("Current file: —");
             layout.Controls.Add(_fileLabel, 0, 0);
@@ -281,6 +303,52 @@ namespace DigitAnalyzerSTR
             _overallProgress = MakeProgressBar();
             layout.Controls.Add(_overallProgress, 0, 3);
 
+            var liveHeader = new Label
+            {
+                Text = "LIVE VALUES",
+                Font = new Font("Segoe UI", 8f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(0, 188, 140),
+                Dock = DockStyle.Fill,
+                TextAlign = ContentAlignment.BottomLeft,
+                Margin = new Padding(0, 30, 0, 4)
+            };
+            layout.Controls.Add(liveHeader, 0, 4);
+
+            _liveValuesGrid = new DataGridView
+            {
+                Dock = DockStyle.Fill,
+                BackgroundColor = BgPanel,
+                GridColor = BgMid,
+                BorderStyle = BorderStyle.None,
+                RowHeadersVisible = false,
+                AllowUserToAddRows = false,
+                AllowUserToDeleteRows = false,
+                AllowUserToResizeRows = false,
+                ReadOnly = true,
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+                ColumnHeadersHeight = 56,
+                Font = new Font("Cascadia Code", 8.5f),
+                DefaultCellStyle = new DataGridViewCellStyle
+                {
+                    BackColor = BgPanel,
+                    ForeColor = Accent,
+                    SelectionBackColor = BgMid,
+                    SelectionForeColor = Accent,
+                    Padding = new Padding(24, 0, 24, 0)
+                },
+                ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle
+                {
+                    BackColor = BgMid,
+                    ForeColor = TextMuted,
+                    SelectionBackColor = BgMid,
+                    SelectionForeColor = TextMuted,
+                    Font = new Font("Segoe UI", 8f, FontStyle.Bold)
+                },
+                EnableHeadersVisualStyles = false
+            };
+            _liveValuesGrid.RowTemplate.Height = 44;
+            layout.Controls.Add(_liveValuesGrid, 0, 5);
+
             var logHeader = new Label
             {
                 Text = "ACTIVITY LOG",
@@ -288,9 +356,9 @@ namespace DigitAnalyzerSTR
                 ForeColor = Color.FromArgb(0, 188, 140),
                 Dock = DockStyle.Fill,
                 TextAlign = ContentAlignment.BottomLeft,
-                Margin = new Padding(0, 16, 0, 4)
+                Margin = new Padding(0, 30, 0, 4)
             };
-            layout.Controls.Add(logHeader, 0, 4);
+            layout.Controls.Add(logHeader, 0, 6);
 
             var logStack = new TableLayoutPanel
             {
@@ -300,7 +368,7 @@ namespace DigitAnalyzerSTR
                 BackColor = BgDark
             };
             logStack.RowStyles.Add(new RowStyle(SizeType.Percent, 110F));
-            logStack.RowStyles.Add(new RowStyle(SizeType.Absolute, 64F));
+            logStack.RowStyles.Add(new RowStyle(SizeType.Absolute, 204F));
 
             _logBox = new RichTextBox
             {
@@ -324,7 +392,7 @@ namespace DigitAnalyzerSTR
             };
             logStack.Controls.Add(openBtn, 0, 1);
 
-            layout.Controls.Add(logStack, 0, 5);
+            layout.Controls.Add(logStack, 0, 7);
             parent.Controls.Add(layout);
         }
 
@@ -430,6 +498,9 @@ namespace DigitAnalyzerSTR
             _outputFolderBox.Text = _settings.OutputFolder;
             var intervals = new[] { 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60 };
             _intervalCombo.SelectedIndex = Math.Max(0, Array.IndexOf(intervals, _settings.IntervalSeconds));
+            var thresholds = new[] { 1, 2, 5, 10, 15, 20, 25 };
+            int ti = Array.IndexOf(thresholds, _settings.ErrorThresholdPercent);
+            _errorThresholdCombo.SelectedIndex = ti >= 0 ? ti : 3;
         }
 
         // ---------------------------------------------------------------
@@ -516,9 +587,12 @@ namespace DigitAnalyzerSTR
             _settings.VideoFolder = _videoFolderBox.Text;
             _settings.OutputFolder = _outputFolderBox.Text;
             _settings.IntervalSeconds = int.Parse(_intervalCombo.Text.Split(' ')[1]);
+            _settings.ErrorThresholdPercent = GetErrorThreshold();
             _settings.Save();
 
             SetBusy(true);
+            _liveValuesGrid.Rows.Clear();
+            _liveValuesGrid.Columns.Clear();
             _cts = new CancellationTokenSource();
 
             var files = Directory.GetFiles(_videoFolderBox.Text, "*.mp4")
@@ -530,6 +604,7 @@ namespace DigitAnalyzerSTR
             Log($"Starting batch — {files.Count} video(s), {_settings.IntervalSeconds}s interval.");
 
             int done = 0;
+            int errorThreshold = GetErrorThreshold();
             foreach (var file in files)
             {
                 if (_cts.Token.IsCancellationRequested) break;
@@ -538,10 +613,18 @@ namespace DigitAnalyzerSTR
                 _overallProgress.Value = files.Count > 0 ? done * 100 / files.Count : 0;
                 Log($"Processing: {Path.GetFileName(file)}");
 
+                var previousValues = new Dictionary<string, double>();
                 var prog = new Progress<VideoProcessorProgress>(p =>
                 {
                     _fileLabel.Text = p.Message;
                     _fileProgress.Value = Math.Min(100, p.Percent);
+                    if (p.Values != null && p.Values.Count > 0)
+                    {
+                        LogLiveValues(p.Values, previousValues, errorThreshold);
+                        foreach (var kv in p.Values)
+                            if (double.TryParse(kv.Value, NumberStyles.Any, CultureInfo.InvariantCulture, out double d))
+                                previousValues[kv.Key] = d;
+                    }
                 });
 
                 string timestamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");
@@ -587,6 +670,68 @@ namespace DigitAnalyzerSTR
             _startBtn.Enabled = !busy && _engine != null;
             _stopBtn.Enabled = busy;
             _intervalCombo.Enabled = !busy;
+            _errorThresholdCombo.Enabled = !busy;
+        }
+
+        private int GetErrorThreshold()
+        {
+            if (_errorThresholdCombo.SelectedItem is string s && s.EndsWith('%')
+                && int.TryParse(s[..^1], out int v))
+                return v;
+            return 10;
+        }
+
+        private void LogLiveValues(Dictionary<string, string> values, Dictionary<string, double> prev, int thresholdPct)
+        {
+            // Build columns on first frame
+            if (_liveValuesGrid.Columns.Count == 0)
+            {
+                var timeCol = new DataGridViewTextBoxColumn
+                {
+                    Name = "_time",
+                    HeaderText = "Time",
+                    FillWeight = 55
+                };
+                _liveValuesGrid.Columns.Add(timeCol);
+                foreach (var key in values.Keys)
+                    _liveValuesGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = key, HeaderText = key });
+            }
+
+            int rowIdx = _liveValuesGrid.Rows.Add();
+            var row = _liveValuesGrid.Rows[rowIdx];
+            row.Cells["_time"].Value = DateTime.Now.ToString("HH:mm:ss");
+            row.Cells["_time"].Style.ForeColor = TextMuted;
+
+            foreach (var kv in values)
+            {
+                if (!_liveValuesGrid.Columns.Contains(kv.Key)) continue;
+
+                bool flagged = kv.Value == "?" || string.IsNullOrWhiteSpace(kv.Value);
+                string display = kv.Value;
+
+                if (!flagged
+                    && double.TryParse(kv.Value, NumberStyles.Any, CultureInfo.InvariantCulture, out double current)
+                    && prev.TryGetValue(kv.Key, out double previous)
+                    && previous != 0)
+                {
+                    double changePct = Math.Abs((current - previous) / previous) * 100.0;
+                    if (changePct > thresholdPct)
+                    {
+                        flagged = true;
+                        display = $"{kv.Value} [{changePct:F1}%Δ]";
+                    }
+                }
+
+                var cell = row.Cells[kv.Key];
+                cell.Value = display;
+                if (flagged)
+                {
+                    cell.Style.ForeColor = Danger;
+                    cell.Style.BackColor = Color.FromArgb(55, 25, 25);
+                }
+            }
+
+            _liveValuesGrid.FirstDisplayedScrollingRowIndex = rowIdx;
         }
 
         private void Log(string message, bool accent = false, bool warn = false)
